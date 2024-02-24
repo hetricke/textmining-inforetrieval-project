@@ -11,28 +11,77 @@ def stemWord(word):
 def updateDict(word):
     first_letter = word[0]
     file_name = first_letter + "_dictionary.txt"
+    
+    f = open(file_name, 'a+')
+    f.close()
 
-    df = open(file_name, 'r')
-    data = df.read()
+    rf = open(file_name, 'r')
+    data = rf.read()
+    rf.close()
+
+    df = open(file_name, 'w')
+
     word_list = data.split("\n")
+    
+    word_list.pop(len(word_list)-1)
 
-    start = 0;
-    end = len(word_list)
-    mid = start+end
+    if(len(word_list)==0):
+        word_list.append(word)
+        df.writelines([i+'\n' for i in word_list])
+        df.close()
+        return 1
+    
 
-    loc_found = False
+    if(len(word_list)==1 and word_list[0] != word):
+        word_list.append(word) if word > word_list[0] else word_list.insert(0,word)
+        df.writelines([i+'\n' for i in word_list])
+        df.close()
+        return 1 if word > word_list[0] else 0
+    
+    elif(word_list[0] == word):
+        df.writelines([i+'\n' for i in word_list])
+        df.close()
+        return 0
+    
+    
+    start = 0
+    end = len(word_list)-1
+    mid = int((start+end)/2)
 
-    while not loc_found:
+    while start<= end:
 
         if word_list[mid] == word:
-            return
+            df.writelines([i+'\n' for i in word_list])
+            df.close()
+            return mid
         
-        elif (word_list[mid] < word) and (word_list[mid+1]):
-            loc_found = True
+        if (mid < end):
+            if (word_list[mid] < word) and (word_list[mid+1] > word):
+                word_list.insert(mid+1, word)
+                df.writelines([i+'\n' for i in word_list])
+                df.close()
+                return mid+1
 
-        elif (word_list[mid] < word_list):
-            start = mid
-            mid = start + end
+        elif (word_list[mid] < word):
+            start = mid+1
+            mid = int((start+end)/2)
+
+        elif (word_list[mid] > word):
+            end = mid-1
+            mid = int((start+end)/2)
+
+
+    if (word_list[len(word_list)-1] < word):
+            word_list.append(word)
+            df.writelines([i+'\n' for i in word_list])
+            df.close()
+            return len(word_list)-1
+
+    elif (word_list[0] > word):
+        word_list.insert(0, word)
+        df.writelines([i+'\n' for i in word_list])
+        df.close()
+        return 0
 
     return 0
 
@@ -53,14 +102,13 @@ def combineUnigrams():
 
 
 with open('tiny_wikipedia.txt', 'r') as data:
-    for line in data:
-        new_line = True
-        words = line.split()
+    count = 0
+    for lines in data:
+        words = lines.split()
         for w in words:
-            w = w.lower().translate(None, string.punctuation)
-            stem_word = stemWord(w)
-            w_code = updateDict(stem_word)
-            updateUnigrams(stem_word, w_code, True) if new_line else updateUnigrams(stem_word, w_code)
-
-combineDict()
-combineUnigrams()
+            w_altered = w.lower()
+            print(w)
+            w_code = updateDict(w_altered)
+        count+=1
+        if(count>=1):
+            break
