@@ -55,14 +55,14 @@ def updateDict(word):
             df.close()
             return mid
         
-        if (mid < end):
+        if (mid < len(word_list)-1):
             if (word_list[mid] < word) and (word_list[mid+1] > word):
                 word_list.insert(mid+1, word)
                 df.writelines([i+'\n' for i in word_list])
                 df.close()
                 return mid+1
 
-        elif (word_list[mid] < word):
+        if (word_list[mid] < word):
             start = mid+1
             mid = int((start+end)/2)
 
@@ -72,18 +72,21 @@ def updateDict(word):
 
 
     if (word_list[len(word_list)-1] < word):
-            word_list.append(word)
-            df.writelines([i+'\n' for i in word_list])
-            df.close()
-            return len(word_list)-1
+        word_list.append(word)
+        df.writelines([i+'\n' for i in word_list])
+        df.close()
+        return len(word_list)-1
 
     elif (word_list[0] > word):
         word_list.insert(0, word)
         df.writelines([i+'\n' for i in word_list])
         df.close()
         return 0
+        
+    df.writelines([i+'\n' for i in word_list])
+    df.close()
 
-    return 0
+    return -1
 
 
 #update unigrams.txt
@@ -109,6 +112,9 @@ with open('tiny_wikipedia.txt', 'r') as data:
             w_altered = w.lower()
             print(w)
             w_code = updateDict(w_altered)
+
+            if(w_code == -1):
+                print ("error with word: "+w)
         count+=1
         if(count>=1):
             break
