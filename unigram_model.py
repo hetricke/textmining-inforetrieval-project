@@ -1,22 +1,23 @@
 import string
 
-#hash the dictionary by having different txt files for different starting letters
 #gonna have to cycle through the document twice b/c you won't know the word code until you've tabulated all of them
 
+#tracks how many words are in each sub-dictionary
 alphabet_count = {}
+
 #returns stemmed word
 def stemWord(word):
     return ""
 
+#updates the alphabet count dictionary
 def updateAlphabetCount(letter, count):
     global alphabet_count
-
     if letter in alphabet_count:
         alphabet_count[letter] = count
     else:
         alphabet_count.update({letter : count})
 
-#updates the dictionary with a new word if needed; either way returns the word code
+#updates the correct sub-dictionary with a new word if needed; either way returns the word code
 def updateDict(word):
     first_letter = word[0]
     file_name = first_letter + "_dictionary.txt"
@@ -24,7 +25,6 @@ def updateDict(word):
     #Ensure the file exists and creates it if it doesn't
     f = open(file_name, 'a+')
     f.close()
-
 
     #Reads out the data
     rf = open(file_name, 'r')
@@ -110,6 +110,14 @@ def updateDict(word):
 #update unigrams.txt
 #gotta figure out how to track which doc (line) we're on 
 def updateUnigrams(word, word_code, new_doc = False):
+    first_letter = word[0]
+    file_name = first_letter + "_dictionary.txt"
+
+    
+    rf = open(file_name, 'r')
+    data = rf.read()
+    rf.close()
+    
     return
 
 updateUnigrams.counter = 0
