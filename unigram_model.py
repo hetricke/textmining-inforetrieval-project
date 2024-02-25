@@ -3,7 +3,9 @@ import string
 #gonna have to cycle through the document twice b/c you won't know the word code until you've tabulated all of them
 
 #tracks how many words are in each sub-dictionary
-alphabet_count = {}
+#Switch to a list based version - you gotta keep order to use it for the unigrams
+alphabet = []
+alphabet_counts = []
 
 #returns stemmed word
 def stemWord(word):
@@ -12,10 +14,58 @@ def stemWord(word):
 #updates the alphabet count dictionary
 def updateAlphabetCount(letter, count):
     global alphabet_count
+    global alphabet
+
     if letter in alphabet_count:
-        alphabet_count[letter] = count
+        index = alphabet.index(letter)
+        alphabet_count[index] = count
+
+    if(len(alphabet)==0):
+        alphabet.append(letter)
+        alphabet_count.append(count)
+        return 1
+
+    if(len(alphabet)==1 and alphabet[0] != letter):
+        alphabet.append(letter) if letter > alphabet[0] else alphabet.insert(0,letter)
+        alphabet_count.append(1) if letter > alphabet[0] else alphabet_count.insert(0,count)
+        return
+    
+    elif(alphabet[0] == letter):
+        alphabet_counts[0] = count
+        return 0
+
     else:
-        alphabet_count.update({letter : count})
+        start = 0
+        end = len(alphabet)-1
+        mid = int((start+end)/2)
+
+        while start<= end:
+            
+            if (mid < len(alphabet)-1):
+                if (alphabet[mid] < letter) and (alphabet[mid+1] > letter):
+                    alphabet.insert(mid+1, letter)
+                    alphabet_count.insert(mid+1, count)
+                    return
+
+            if (alphabet[mid] < letter):
+                start = mid+1
+                mid = int((start+end)/2)
+
+            elif (alphabet[mid] > letter):
+                end = mid-1
+                mid = int((start+end)/2)
+
+        if (alphabet[len(alphabet)-1] < letter):
+            alphabet.append(letter)
+            alphabet_count.append(count)
+
+            return
+
+        elif (alphabet[0] > letter):
+            alphabet.insert(0, letter)
+            alphabet_count.append(count)
+            return
+        
 
 #updates the correct sub-dictionary with a new word if needed; either way returns the word code
 def updateDict(word):
@@ -55,7 +105,6 @@ def updateDict(word):
     elif(word_list[0] == word):
         df.writelines([i+'\n' for i in word_list])
         df.close()
-        updateAlphabetCount(first_letter, len(word_list))
         return 0
     
     start = 0
@@ -67,7 +116,6 @@ def updateDict(word):
         if word_list[mid] == word:
             df.writelines([i+'\n' for i in word_list])
             df.close()
-            updateAlphabetCount(first_letter, len(word_list))
             return mid
         
         if (mid < len(word_list)-1):
@@ -112,11 +160,20 @@ def updateDict(word):
 def updateUnigrams(word, word_code, new_doc = False):
     first_letter = word[0]
     file_name = first_letter + "_dictionary.txt"
+    first_letter_index = alphabet.index(first_letter)
 
-    
     rf = open(file_name, 'r')
     data = rf.read()
     rf.close()
+
+    word_list = data.split("\n")
+    word_list.pop(len(word_list)-1)
+
+    word_code = word_list.index(word)
+    word_code += sum(alphabet_counts[:first_letter_index])
+
+
+
     
     return
 
