@@ -1,24 +1,36 @@
-import string
-
+from dataclasses import dataclass
 #gonna have to cycle through the document twice b/c you won't know the word code until you've tabulated all of them
 
 #tracks how many words are in each sub-dictionary
 #Switch to a list based version - you gotta keep order to use it for the unigrams
+
+
+@dataclass
+class Unigram:
+    word_code: int
+    word: str
+    doc_count: int
+    global_count: int
+
 alphabet = []
-alphabet_counts = []
+alphabet_count = []
+
+unigram_dict = {}
+unigram_list = []
 
 #returns stemmed word
 def stemWord(word):
     return ""
 
-#updates the alphabet count dictionary
+#updates the alphabet_count lists to track how many words belonging to each letter have been found
 def updateAlphabetCount(letter, count):
     global alphabet_count
     global alphabet
 
-    if letter in alphabet_count:
+    if letter in alphabet:
         index = alphabet.index(letter)
         alphabet_count[index] = count
+        return
 
     if(len(alphabet)==0):
         alphabet.append(letter)
@@ -31,7 +43,7 @@ def updateAlphabetCount(letter, count):
         return
     
     elif(alphabet[0] == letter):
-        alphabet_counts[0] = count
+        alphabet_count[0] = count
         return 0
 
     else:
@@ -155,9 +167,10 @@ def updateDict(word):
     return -1
 
 
-#update unigrams.txt
-#gotta figure out how to track which doc (line) we're on 
-def updateUnigrams(word, word_code, new_doc = False):
+def getWordCode(word):
+    global alphabet
+    global alphabet_count
+
     first_letter = word[0]
     file_name = first_letter + "_dictionary.txt"
     first_letter_index = alphabet.index(first_letter)
@@ -170,21 +183,61 @@ def updateUnigrams(word, word_code, new_doc = False):
     word_list.pop(len(word_list)-1)
 
     word_code = word_list.index(word)
-    word_code += sum(alphabet_counts[:first_letter_index])
+    word_code += sum(alphabet_count[:first_letter_index])
+
+    return word_code
+
+#update unigrams.txt
+def updateUnigrams(word, new_doc = False):
+    global unigram_dict
+    global unigram_list
+
+    word_code = getWordCode(word)
+    
+    if word_code in unigram_dict:
+        unigram = unigram_dict[word_code]
+        unigram.global_count += 1
+
+        if new_doc:
+            unigram.doc_count += 1
+        
+        index = unigram_list.index(unigram)
+        tracker = index-1
+        unigram_list.pop(index)
+
+        gc = unigram.global_count
+        tgc = unigram_list[tracker].global_count
+    
+        while tracker > 0 and tgc <= gc:
+            tgc = unigram_list[tracker].global_count
+            tracker -= 1
 
 
+        unigram_list.insert(tracker, unigram)
 
+    else:
+        unigram = Unigram(word_code, word, 1, 1)
+        unigram_dict.update({word_code : unigram})
+        unigram_list.append(unigram)
     
     return
 
-updateUnigrams.counter = 0
+def writeOutUnigrams():
+    global unigram_list
+    
+    f = open("unigrams.txt", 'a+')
+    f.close()
+
+    wf = open("unigrams.txt", 'w')
+
+    for unigram in unigram_list:
+        line = str(unigram.word_code) +" "+ unigram.word +" "+ str(unigram.doc_count) +" "+ str(unigram.global_count) + "\n"
+        wf.write(line)
+
+    wf.close()
 
 def combineDict():
     return
-
-def combineUnigrams():
-    return
-
 
 
 with open('tiny_wikipedia.txt', 'r') as data:
@@ -198,4 +251,17 @@ with open('tiny_wikipedia.txt', 'r') as data:
         if(count>=1):
             break
 
-print(alphabet_count)
+with open('tiny_wikipedia.txt', 'r') as data:
+    for lines in data:
+        n_doc = True
+        words = lines.split()
+        for w in words:
+            w_altered = w.lower()
+            w_code = updateUnigrams(w_altered, n_doc)
+            n_doc = False
+
+        count+=1
+        if(count>=1):
+            break
+
+writeOutUnigrams()
