@@ -1,9 +1,13 @@
 from dataclasses import dataclass
-#gonna have to cycle through the document twice b/c you won't know the word code until you've tabulated all of them
+from pathlib import Path
 
-#tracks how many words are in each sub-dictionary
-#Switch to a list based version - you gotta keep order to use it for the unigrams
+#create a conda environment for this and export it as a yml to be sent with the code
+#just need to grab an appropriate lemmatizer
+#and do a regex to eliminate punctuation
+#might not be a bad idea to create a stemmed version of the docs so that the unigram portion doesn't have to reprocess
 
+#env name : info_retrieval_env
+#add pathlib to env
 
 @dataclass
 class Unigram:
@@ -78,7 +82,6 @@ def updateAlphabetCount(letter, count):
             alphabet_count.append(count)
             return
         
-
 #updates the correct sub-dictionary with a new word if needed; either way returns the word code
 def updateDict(word):
     first_letter = word[0]
@@ -96,8 +99,7 @@ def updateDict(word):
     #Prepares to write to the file
     df = open(file_name, 'w')
 
-    word_list = data.split("\n")
-    
+    word_list = data.split("\n")   
     word_list.pop(len(word_list)-1)
 
     if(len(word_list)==0):
@@ -166,7 +168,7 @@ def updateDict(word):
 
     return -1
 
-
+#returns the word code of the given word
 def getWordCode(word):
     global alphabet
     global alphabet_count
@@ -187,7 +189,7 @@ def getWordCode(word):
 
     return word_code
 
-#update unigrams.txt
+#updates the unigrams list
 def updateUnigrams(word, new_doc = False):
     global unigram_dict
     global unigram_list
@@ -205,13 +207,11 @@ def updateUnigrams(word, new_doc = False):
         tracker = index-1
         unigram_list.pop(index)
 
-        gc = unigram.global_count
         tgc = unigram_list[tracker].global_count
     
-        while tracker > 0 and tgc <= gc:
+        while tracker > 0 and tgc <= unigram.global_count:
             tgc = unigram_list[tracker].global_count
             tracker -= 1
-
 
         unigram_list.insert(tracker, unigram)
 
@@ -222,6 +222,7 @@ def updateUnigrams(word, new_doc = False):
     
     return
 
+#saves the unigrams list to a txt file
 def writeOutUnigrams():
     global unigram_list
     
@@ -235,11 +236,37 @@ def writeOutUnigrams():
         wf.write(line)
 
     wf.close()
+    unigram_dict.clear()
+    unigram_list.clear()
+
 
 def combineDict():
+    global alphabet
+    
+    dictionary_list = []
+
+    for letter in alphabet:
+        file_name = letter + "_dictionary.txt"
+        rf = open(file_name, 'r')
+        data = rf.read()
+        rf.close()
+
+        word_list = data.split("\n")   
+        word_list.pop(len(word_list)-1)
+
+        dictionary_list += word_list
+
+        p = Path(file_name)
+        p.unlink()
+
+    df = open("dictionary.txt", 'a+')
+    df.writelines([i+'\n' for i in dictionary_list])
+    df.close()
+
+
     return
 
-
+#cycles through the whole doc list to create the dictionary
 with open('tiny_wikipedia.txt', 'r') as data:
     count = 0
     for lines in data:
@@ -251,6 +278,7 @@ with open('tiny_wikipedia.txt', 'r') as data:
         if(count>=1):
             break
 
+#cycles through the whole doc list to create the unigrams file
 with open('tiny_wikipedia.txt', 'r') as data:
     for lines in data:
         n_doc = True
