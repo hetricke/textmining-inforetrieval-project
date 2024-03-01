@@ -1,13 +1,13 @@
 from dataclasses import dataclass
 from pathlib import Path
+import tqdm
+import nltk
+import re
 
 #create a conda environment for this and export it as a yml to be sent with the code
-#just need to grab an appropriate lemmatizer
-#and do a regex to eliminate punctuation
 #might not be a bad idea to create a stemmed version of the docs so that the unigram portion doesn't have to reprocess
 
 #env name : info_retrieval_env
-#add pathlib to env
 
 @dataclass
 class Unigram:
@@ -24,7 +24,21 @@ unigram_list = []
 
 #returns stemmed word
 def stemWord(word):
-    return ""
+
+    if word[0] == "<" and word[len(word)-1]==">":
+        return ""
+
+    if re.search("(?P<url>https?://[^\s]+)", word) != None:
+        return ""
+
+    w = word.lower()
+    w = re.sub("[^a-z0-9]", "", w)
+
+    if len(w) == 0:
+        return ""
+    
+    stemmer = nltk.stem.SnowballStemmer('english')
+    return stemmer.stem(w)
 
 #updates the alphabet_count lists to track how many words belonging to each letter have been found
 def updateAlphabetCount(letter, count):
@@ -204,16 +218,22 @@ def updateUnigrams(word, new_doc = False):
             unigram.doc_count += 1
         
         index = unigram_list.index(unigram)
+
+        if not (index > 0):
+            return
+        
         tracker = index-1
-        unigram_list.pop(index)
+        unigram_list.pop(index)    
 
-        tgc = unigram_list[tracker].global_count
-    
-        while tracker > 0 and tgc <= unigram.global_count:
-            tgc = unigram_list[tracker].global_count
-            tracker -= 1
+        for i in range(tracker, -1, -1):
+            tgc = unigram_list[i].global_count
 
-        unigram_list.insert(tracker, unigram)
+            if(tgc > unigram.global_count):
+                unigram_list.insert(i+1, unigram)
+                break
+
+            if i==0:
+                unigram_list.insert(i, unigram)
 
     else:
         unigram = Unigram(word_code, word, 1, 1)
@@ -239,7 +259,6 @@ def writeOutUnigrams():
     unigram_dict.clear()
     unigram_list.clear()
 
-
 def combineDict():
     global alphabet
     
@@ -262,34 +281,42 @@ def combineDict():
     df = open("dictionary.txt", 'a+')
     df.writelines([i+'\n' for i in dictionary_list])
     df.close()
-
-
     return
 
+
+ltc_file = open("stemmed_tiny_wikipedia.txt", "a+")
+ltc_file.close()
+ltc_file = open("stemmed_tiny_wikipedia.txt", "w")
+
+
 #cycles through the whole doc list to create the dictionary
+print("Creating dictionary....")
 with open('tiny_wikipedia.txt', 'r') as data:
     count = 0
-    for lines in data:
+    for lines in tqdm.tqdm(data):
         words = lines.split()
+        stemmed_words = []
         for w in words:
-            w_altered = w.lower()
-            w_code = updateDict(w_altered)
-        count+=1
-        if(count>=1):
-            break
+            w_altered = stemWord(w)
+            if len(w_altered) == 0:
+                continue
 
+            stemmed_words.append(w_altered)
+            w_code = updateDict(w_altered)
+        ltc_file.writelines([i+' ' for i in stemmed_words])
+        ltc_file.write("\n")
+
+ltc_file.close()
+
+print("Creating unigram.txt....")
 #cycles through the whole doc list to create the unigrams file
-with open('tiny_wikipedia.txt', 'r') as data:
-    for lines in data:
+with open('stemmed_tiny_wikipedia.txt', 'r') as data:
+    for lines in tqdm.tqdm(data):
         n_doc = True
         words = lines.split()
         for w in words:
-            w_altered = w.lower()
-            w_code = updateUnigrams(w_altered, n_doc)
+            updateUnigrams(w, n_doc)
             n_doc = False
 
-        count+=1
-        if(count>=1):
-            break
-
 writeOutUnigrams()
+combineDict()
