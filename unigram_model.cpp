@@ -105,17 +105,28 @@ void writeOutDictionary(){
 }
 
 void updateUnigram(string word, bool new_doc){
+
+
     return;
 }
 
 void writeOutUnigrams(){
+    ofstream unigrams_file ("unigrams.txt");
 
+    for(int i = 0; i<unigrams_global_count.size(); i++){
+        string unigram_output = unigrams_global_count[i].word_code + " ";
+        unigram_output += unigrams_global_count[i].word + " ";
+        unigram_output += unigrams_global_count[i].doc_count + " ";
+        unigram_output += unigrams_global_count[i].global_count + " ";
+
+        unigrams_file << unigram_output << endl;
+    }
+
+    unigrams_file.close()
     return;
 }
 
 int main(){
-
-
     return 0;
 }
 
