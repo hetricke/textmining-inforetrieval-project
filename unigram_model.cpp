@@ -91,7 +91,16 @@ void updateDictionary(string word){
     }
 }
 
-void combineDictionary(){
+void writeOutDictionary(){
+    ofstream dictionary_file ("dictionary.txt");
+
+    for(int i = 0; i<dictionary.size(); i++){
+        for(int j = 0; j<dictionary[i].size(); j++){
+            dictionary_file << dictionary[i][j] << endl;
+        }
+    }
+
+    dictionary_file.close()
     return;
 }
 
