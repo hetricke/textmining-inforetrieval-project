@@ -15,6 +15,8 @@ struct Unigram{
 vector<int> alphabet = {};
 vector<int> alphabet_count = {};
 
+vector<vector<string>> dictionary = {};
+
 vector<Unigram> unigram_word_code = {};
 vector<Unigram> unigram_global_count = {};
 
@@ -24,100 +26,69 @@ string stemWord(string word){
     return "";
 }
 
-void updateAlphabetCount(string letter, int count){
+int updateAlphabetCount(string letter){
 
     auto search_result = lower_bound(alphabet.begin(), alphabet.end(), letter);
 
-    if (search_result != alphabet.end()){
-        int index = distance(alphabet.begin(), search_result);
-        alphabet_count[index] = count;
+    if(search_result = alphabet.end()){
+        alphabet.push_back(letter);
+        alphabet_count.push_back(1);
+        return alphabet.size()-1;
+    }
+
+    int index = distance(alphabet.begin(), search_result);
+    if (alphabet[index] == letter){
+        alphabet_count[index] +=1;
+        return index;
     }
     else{
-        auto insertion_point = upper_bound(alphabet.begin(), alphabet.end(), letter);
-        alphabet.insert(insertion_point, letter);
+        alphabet.insert(search_result, letter);
+        alphabet_count.insert(index, 1)
 
-        int index = distance(alphabet.begin(), insertion_point);
-        alphabet_count.insert(index, count)
+        vector<string> new_dict = {};
+        dictionary.insert(index, new_dict);
+
+        return index;
     }
 
-    return;
 }
 
 int getWordCode(string word){
-    string file_name = word.substr(0,1) + "_dictionary.txt";
-    ifstream dictionary_file;
-    dictionary_file.open(file_name);
+    auto letter_search = lower_bound(alphabet.begin(), alphabet.end(), word.substr(0,1));
+    int letter_index = distance(alphabet.begin(), letter_search);
 
-    int start = 0;
+    auto word_search = lower_bound(dictionary[letter_index].begin(), dictionary[letter_index].end(), word);
+    int word_index = distance(dictionary[letter_index].begin(), word_search);
 
-    auto search_result = lower_bound(alphabet.begin(), alphabet.end(), word.substr(0,1));
-    int end = distance(alphabet.begin(), search_result);
 
-    int mid = (start+end)/2;
-
-    while(start<=end){
-        string file_word;
-        getline(dictionary_file, mid)
-        if(file_word == word){
-            dictionary_file.close()
-            return mid;
-        }
-        else if (file_word < word){
-            start = mid+1;
-        }
-        else{
-            end = mid-1;
-        }
-        mid = (start+end)/2;
-
+    int word_code = 0;
+    for (int i = 0; i<letter_index; i++){
+        word_code += alphabet_count[i];
     }
 
-    dictionary_file.close()
-
-    return -1;
+    return word_code+word_index;
 }
 
 void updateDictionary(string word){
-    string file_name = word.substr(0,1) + "_dictionary.txt";
-    ifstream dictionary_file;
-    dictionary_file.open(file_name);
 
-    int start = 0;
+    int letter_index = updateAlphabetCount(word.substr(0,1));
 
-    auto search_result = lower_bound(alphabet.begin(), alphabet.end(), word.substr(0,1));
-    int end = distance(alphabet.begin(), search_result);
+    auto search_result = lower_bound(dictionary[letter_index].begin(), dictionary[letter_index].end(), word);
 
-    int mid = (start+end)/2;
-
-    while(start<=end){
-        string file_word;
-        getline(dictionary_file, mid)
-        if(file_word == word){
-            dictionary_file.close()
-            return;
-        }
-
-        //TODO: check if this will exceed the end of the file
-        //TODO: read in all the file after this point into a vector and make the changes to the txt file
-        string next_file_word;
-        getline(dictionary_file, mid+1)
-
-        if ()
-        else if (file_word < word){
-            start = mid+1;
-        }
-        else{
-            end = mid-1;
-        }
-        mid = (start+end)/2;
-
+    if (search_result == dictionary[letter_index].end()){
+        dictionary[letter_index].push_back(word);
+        return;
     }
 
-    dictionary_file.close()
+    int index = distance(dictionary[letter_index], search_result);
 
-    return -1;
-
-    return;
+    if (dictionary[letter_index][index] == word){
+        return;
+    }
+    else{
+        dictionary[letter_index].insert(index, word);
+        return;
+    }
 }
 
 void combineDictionary(){
