@@ -4,6 +4,13 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <algorithm>
+#include <cctype>
+#include <regex>
+#include "OleanderStemmingLibrary-master/src/english_stem.h"
+#include <codecvt>
+#include <locale>
+
 using namespace std;
 
 struct Unigram{
@@ -15,18 +22,18 @@ struct Unigram{
 
 };
 
-struct CompareCodeUnigrams{
+struct CompareWordUnigrams{
 
-    bool operator()(const Unigram &left, const Unigram &right){
-        return left.word_code <= right.word_code;
+    bool operator()(const Unigram *left, const Unigram *right){
+        return left->word < right->word;
     }
 
-    bool operator()(const Unigram &left, const int &right){
-        return left.word_code <= right;
+    bool operator()(const Unigram *left, const string &right){
+        return left->word < right;
     }
 
-    bool operator()(const int &left, const Unigram &right){
-        return left <= right.word_code;
+    bool operator()(const string &left, const Unigram *right){
+        return left < right->word;
     }
 
 
@@ -34,53 +41,85 @@ struct CompareCodeUnigrams{
 
 struct CompareCountUnigrams{
 
-    bool operator()(const Unigram &left, const Unigram &right){
-        return left.global_count <= right.global_count;
-    }
+    bool operator()(const Unigram *left, const Unigram *right){
+        if(left->global_count != right->global_count){
+            return left->global_count > right->global_count;
+        }
+        else{
+            return left->word > right->word;
+        }
 
-    bool operator()(const Unigram &left, const int &right){
-        return left.global_count <= right;
-    }
-
-    bool operator()(const int &left, const Unigram &right){
-        return left <= right.global_count;
     }
 };
 
 vector<string> alphabet;
-vector<int> alphabet_count;
 
-vector<vector<string>> dictionary;
+vector<vector<Unigram *>> dictionary;
 
-vector<Unigram> unigram_word_code;
-vector<Unigram> unigram_global_count;
+vector<Unigram *> unigrams;
 
 
-string stemWord(string &word){
+//returns a stemmed version of a given string
+string stemWord(const string &w){
 
-    return "";
+    //checks for urls and returns an empty string if true
+    regex url("(http|ftp|https):\\/\\/([\\w_-]+(?:(?:\\.[\\w_-]+)+))([\\w.,@?^=%&:\\/~+#-]*[\\w@?^=%&\\/~+#-])");
+    smatch m;
+    if (regex_search(w.begin(), w.end(), m, url)){
+
+        return "";
+    }
+
+    //checks for formatting tags
+    if(w.substr(0,1) == "<"
+    && w.substr(w.length()-1) == ">"){
+        return "";
+    }
+
+    string stemmed_word = w;
+
+    //transforms the word into lowercase
+    transform(stemmed_word.begin(), stemmed_word.end(), stemmed_word.begin(), ::tolower);
+
+    //removes all non-alphanumeric characters
+    stemmed_word = regex_replace(stemmed_word, regex(R"([^a-z0-9])"), "");
+
+    stemming::english_stem<> StemEnglish;
+    wstring word = wstring_convert<std::codecvt_utf8<wchar_t>>().from_bytes(stemmed_word);
+    StemEnglish(word);
+    stemmed_word =  std::wstring_convert<std::codecvt_utf8<wchar_t>>().to_bytes(word);
+
+    return stemmed_word;
 }
 
-int updateAlphabetCount(const string letter){
+int updateAlphabetCount(const string &letter){
+
+    if (alphabet.empty()){
+        alphabet.push_back(letter);
+        vector<Unigram *> new_dict;
+        dictionary.push_back(new_dict);
+        return 0;
+
+    }
 
     auto search_result = lower_bound(alphabet.begin(), alphabet.end(), letter);
 
     if(search_result == alphabet.end()){
         alphabet.push_back(letter);
-        alphabet_count.push_back(1);
+        vector<Unigram *> new_dict;
+        dictionary.push_back(new_dict);
+
         return alphabet.size()-1;
     }
 
     int index = distance(alphabet.begin(), search_result);
     if (alphabet[index] == letter){
-        alphabet_count[index] +=1;
         return index;
     }
     else{
         alphabet.insert(search_result, letter);
-        alphabet_count.insert(alphabet_count.begin()+index, 1);
 
-        vector<string> new_dict;
+        vector<Unigram *> new_dict;
         dictionary.insert(dictionary.begin()+index, new_dict);
 
         return index;
@@ -88,121 +127,98 @@ int updateAlphabetCount(const string letter){
 
 }
 
-int getWordCode(string word){
-    auto letter_search = lower_bound(alphabet.begin(), alphabet.end(), word.substr(0,1));
-    int letter_index = distance(alphabet.begin(), letter_search);
+void updateUnigram(Unigram *u){
 
-    auto word_search = lower_bound(dictionary[letter_index].begin(), dictionary[letter_index].end(), word);
-    int word_index = distance(dictionary[letter_index].begin(), word_search);
+    auto search_result = lower_bound(unigrams.begin(), unigrams.end(), u, CompareCountUnigrams());
 
-
-    int word_code = 0;
-    for (int i = 0; i<letter_index; i++){
-        word_code += alphabet_count[i];
+    if(search_result == unigrams.end()){
+        unigrams.push_back(u);
+        return;
     }
 
-    return word_code+word_index;
+    int index = std::distance(unigrams.begin(), search_result);
+
+    if(unigrams[index]->word == u->word){
+        Unigram *v = unigrams[index];
+        v->global_count++;
+        unigrams.erase(search_result);
+
+        auto new_loc = lower_bound(unigrams.begin(), unigrams.end(), v, CompareCountUnigrams());
+        unigrams.insert(new_loc, v);
+    }
+
+    else{
+        unigrams.insert(search_result, u);
+    }
+
 }
 
-void updateDictionary(string word){
+void updateDictionary(const string &word, bool new_doc){
 
     int letter_index = updateAlphabetCount(word.substr(0,1));
 
-    auto search_result = lower_bound(dictionary[letter_index].begin(), dictionary[letter_index].end(), word);
+    auto *u = new Unigram;
+    u->word = word;
+    u->global_count = 1;
+    u->doc_count = 1;
+
+    if (dictionary[letter_index].empty()){
+        dictionary[letter_index].push_back(u);
+        updateUnigram(u);
+        return;
+    }
+
+    auto search_result = lower_bound(dictionary[letter_index].begin(), dictionary[letter_index].end(), u, CompareWordUnigrams());
 
     if (search_result == dictionary[letter_index].end()){
-        dictionary[letter_index].push_back(word);
+
+        dictionary[letter_index].push_back(u);
+        updateUnigram(u);
         return;
     }
 
     int index = std::distance(dictionary[letter_index].begin(), search_result);
 
-    if (dictionary[letter_index][index] == word){
+    if (dictionary[letter_index][index]->word == word){
+
+        if(new_doc){
+            dictionary[letter_index][index]->doc_count++;
+        }
+        updateUnigram(dictionary[letter_index][index]);
+
         return;
     }
     else{
-        dictionary[letter_index].insert(search_result, word);
+        dictionary[letter_index].insert(search_result, u);
+        updateUnigram(u);
         return;
     }
+
 }
 
 void writeOutDictionary(){
     ofstream dictionary_file ("dictionary.txt");
+    int word_code = 0;
+    for(vector<Unigram *> &i : dictionary){
+        for(Unigram * &j : i){
 
-    for(int i = 0; i<dictionary.size(); i++){
-        for(int j = 0; j<dictionary[i].size(); j++){
-            dictionary_file << dictionary[i][j] << endl;
+            dictionary_file << j->word << endl;
+            j->word_code = word_code;
+            word_code++;
         }
     }
 
     dictionary_file.close();
 }
 
-void updateUnigram(const string word, bool new_doc){
-    int word_code = getWordCode(word);
-
-    auto word_code_search = lower_bound(unigram_word_code.begin(), unigram_word_code.end(), word_code, CompareCodeUnigrams());
-
-    if (word_code_search == unigram_word_code.end()){
-        Unigram u;
-        u.word_code = word_code;
-        u.word = word;
-        u.doc_count = 1;
-        u.global_count = 1;
-
-        unigram_word_code.push_back(u);
-        unigram_global_count.push_back(u);
-        return;
-    }
-
-    int code_index = std::distance(unigram_word_code.begin(), word_code_search);
-
-    if (unigram_word_code[code_index].word_code != word_code){
-        Unigram u;
-        u.word_code = word_code;
-        u.word = word;
-        u.doc_count = 1;
-        u.global_count = 1;
-
-        unigram_word_code.insert(word_code_search, u);
-        unigram_global_count.push_back(u);
-        return;
-    }
-    else{
-
-        Unigram u = unigram_word_code[code_index];
-        if (new_doc){
-            u.doc_count++;
-        }
-
-        auto count_loc_search = lower_bound(unigram_global_count.begin(), unigram_global_count.end(), u.global_count, CompareCountUnigrams());
-        auto count_new_loc_search = lower_bound(unigram_global_count.begin(), unigram_global_count.end(), u.global_count+1, CompareCountUnigrams());
-
-        int count_index = distance(unigram_global_count.begin(), count_loc_search);
-        while(unigram_global_count[count_index].global_count == u.global_count){
-
-            if (unigram_global_count[count_index].word_code == u.word_code){
-                unigram_global_count.erase(unigram_global_count.begin()+count_index);
-                break;
-            }
-
-            count_index++;
-        }
-
-        u.global_count++;
-        unigram_global_count.insert(count_new_loc_search, u);
-        return;
-    }
-}
-
 void writeOutUnigrams(){
     ofstream unigrams_file ("unigrams.txt");
 
-    for(int i = 0; i<unigram_global_count.size(); i++){
-        string unigram_output = to_string(unigram_global_count[i].word_code) + " ";
-        unigram_output += unigram_global_count[i].word + " ";
-        unigram_output += to_string(unigram_global_count[i].doc_count) + " ";
-        unigram_output += to_string(unigram_global_count[i].global_count) + " ";
+    for(Unigram *i : unigrams){
+        string unigram_output = to_string(i->word_code) + " ";
+        unigram_output += i->word + " ";
+        unigram_output += to_string(i->doc_count) + " ";
+        unigram_output += to_string(i->global_count) + " ";
 
         unigrams_file << unigram_output << endl;
     }
@@ -210,62 +226,76 @@ void writeOutUnigrams(){
     unigrams_file.close();
 }
 
+
+
 int main(){
-
-
     ifstream datafile("tiny_wikipedia.txt");
     string article;
 
-    int breaker = 0;
+    cout<<"Assembling dictionary..."<<endl;
+    float progress = 0;
+    int bar_width = 70;
+    int tracker = 0;
+    string s_progress;
+
     while(getline(datafile, article)){
         int word_tracker = 0;
+        vector<string> article_words;
         while (word_tracker != -1){
 
-            int next_space = article.find(" ", word_tracker);
+            //slices word out of article and stems it
+            int next_space = article.find(" ", word_tracker+1);
             int word_length = (next_space != -1) ? next_space-word_tracker : next_space;
-            updateDictionary(article.substr(word_tracker+1, word_length));
+            string word = article.substr(word_tracker, word_length);
+            word = stemWord(word);
+
+            if(word.empty()){
+                word_tracker = next_space;
+                continue;
+            }
+
+            //checks to see if word is new in article
+            auto search = lower_bound(article_words.begin(), article_words.end(), word);
+
+            if(search == article_words.end()){
+                article_words.push_back(word);
+                updateDictionary(word, true);
+
+            }
+            else if (*(search) != word){
+                article_words.insert(search, word);
+                updateDictionary(word, true);
+            }
+
+            else{
+                updateDictionary(word, false);
+            }
+
             word_tracker = next_space;
 
         }
-
-        breaker++;
-
-        if(breaker > 3){
-            break;
+        tracker++;
+        int pos = bar_width * progress;
+        s_progress ="[";
+        for (int i = 0; i < bar_width; ++i) {
+            if (i < pos) s_progress += "=";
+            else if (i == pos) s_progress +=  ">";
+            else s_progress += " ";
         }
+        s_progress += "] " + to_string(int(progress * 100)) + " % " + to_string(tracker) + "/50000\r";
+        cout<<s_progress;
+        cout.flush();
+
+        progress = float(tracker)/50000;
     }
 
     datafile.close();
+    cout<<endl;
+    cout<<"Printing dictionary..."<<endl;
     writeOutDictionary();
 
-    breaker = 0;
-
-    datafile.open("tiny_wikipedia.txt");
-
-    while(getline(datafile, article)){
-        int word_tracker = 0;
-        bool ndoc = true;
-
-        while (word_tracker != -1){
-
-            int next_space = article.find(" ", word_tracker);
-            int word_length = (next_space != -1) ? next_space-word_tracker : next_space;
-            updateUnigram(article.substr(word_tracker+1, word_length), ndoc);
-            word_tracker = next_space;
-
-            ndoc = false;
-
-        }
-
-        breaker++;
-
-        if(breaker > 3){
-            break;
-        }
-    }
-
+    cout<<"Printing unigrams..."<<endl;
     writeOutUnigrams();
-    datafile.close();
     return 0;
 }
 
