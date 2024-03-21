@@ -14,8 +14,8 @@ using namespace std;
 //TODO: fix stemming operation
 /*
  * Aight. Here's the plan.
- * The entry struct becomes an entry struct recording the relevant inverted index data
- * Dictionary vector(s) stores a string. The idea is on the first pass-thru you assemble all aspects of the inverted index entry except the word code
+ * The unigram struct becomes an entry struct recording the relevant inverted index data
+ * Dictionary vector(s) store a string. The idea is on the first pass-thru you assemble all aspects of the inverted index entry except the word code
  * Then you iterate over just the local index collection again to insert the correct word code, binary searching the dictionary to find it
  * */
 
@@ -45,10 +45,20 @@ struct CompareWordEntries{
 
 };
 
-struct CompareDocCount{
+struct CompareDocID{
 
-    bool operator()(const int* left, const int* right){
-        return left[1] <= right[1];
+    bool operator()(const int* left, const int right){
+        return left[0] < right;
+
+    }
+
+    bool operator()(const int left, const int* right){
+        return left < right[0];
+
+    }
+
+    bool operator()(const int left, const int right){
+        return left < right;
 
     }
 };
@@ -124,29 +134,32 @@ int updateAlphabetCount(const string &letter){
 }
 
 //TODO: Update
-void updateEntries(string word){
+void updateEntries(string word, int doc_id){
 
-    auto search_result = lower_bound(entries.begin(), entries.end(), e, CompareWordEntries());
+    auto search_result = lower_bound(entries.begin(), entries.end(), word, CompareWordEntries());
 
-    if(search_result == entries.end()){
+    if (search_result != entries.end()){
+
+        int index = std::distance(entries.begin(), search_result);
+
+        if(entries[index]->word == word){
+            Entry *v = entries[index];
+
+            auto search_for_doc = lower_bound(v->doc_id_freq.begin(), v->doc_id_freq.end(), doc_id, CompareDocID());
+            entries.erase(search_result);
+        }
+
+        else{
+            entries.insert(search_result, u);
+        }
+
+    }
+
+    else{
         entries.push_back(e);
         return;
     }
 
-    int index = std::distance(entries.begin(), search_result);
-
-    if(entries[index]->word == u->word){
-        Entry *v = entries[index];
-        v->global_count++;
-        entries.erase(search_result);
-
-        auto new_loc = lower_bound(entries.begin(), entries.end(), v, CompareCountentries());
-        entries.insert(new_loc, v);
-    }
-
-    else{
-        entries.insert(search_result, u);
-    }
 
 }
 
@@ -281,4 +294,3 @@ int main(){
     writeOutentries();
     return 0;
 }
-
