@@ -4,12 +4,9 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
-#include <algorithm>
-#include <cctype>
 #include <regex>
 #include "OleanderStemmingLibrary-master/src/english_stem.h"
 #include <codecvt>
-#include <locale>
 
 using namespace std;
 
