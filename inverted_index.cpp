@@ -7,7 +7,6 @@
 #include <algorithm>
 #include <cctype>
 #include <regex>
-#include <locale>
 #include <array>
 #include <cassert>
 
@@ -107,6 +106,12 @@ string stemWord(const string &w, const bool &new_doc = false){
     return stemmed_word;
 }
 
+//TODO: fill this in
+int getWordCode(const string& word){
+
+    return 0;
+
+}
 
 int updateAlphabetCount(const string &letter){
 
@@ -234,10 +239,10 @@ void updateDictionary(const string &word){
 
 }
 
-
 void writeOutDictionary(){
     ofstream dictionary_file ("dictionary.txt");
-    for(vector<string > &i : dictionary){
+
+    for(vector<string> &i : dictionary){
         for(string &word : i){
             dictionary_file << word << endl;
         }
@@ -270,24 +275,22 @@ void writeOutEntries(string id){
 
 
 //TODO: Update
-//remember to call update Entries here
 int main(){
 
-
-
+    const int N = 32;
 
     string collection_name = "wiki2022_small.";
     string collection_id = "000000";
 
     //progress bar
-    cout<<"Assembling inverted index for article collection "<< i <<"...." <<endl;
+    cout<<"Assembling inverted index for article collection...." <<endl;
     float progress = 0;
     int bar_width = 70;
     int tracker = 0;
     string s_progress;
 
     //iterates through all article collections to create inverted indexes
-    for(int i = 0; i<32; i++){
+    for(int i = 0; i<N; i++){
 
         string current_col = to_string(i);
         collection_id = collection_id.substr(0, collection_id.length()-current_col.length());
@@ -355,11 +358,72 @@ int main(){
 
     }
 
+
     cout<<endl;
     cout<<"Printing dictionary..."<<endl;
     writeOutDictionary();
 
 
+    string id = "000000";
+    cout<<"Updating inverted indexes with word codes...." <<endl;
+    progress = 0;
+    tracker = 0;
+
+    //Iterates through all inverted indexes to update word codes
+    for (int i = 0; i<N; i++){
+
+        vector<string> final_entries;
+
+        string current_ii = to_string(i);
+        id = id.substr(0, collection_id.length()-current_ii.length());
+        id +=current_ii;
+        string file_name = "inverted_index_"+id;
+
+        int space_tracker = 0;
+        string entry;
+
+        ifstream datafile(collection_name+collection_id);
+
+
+        while(getline(datafile, entry)){
+
+            int first_space = entry.find(" ", 1);
+            space_tracker = first_space;
+            int next_space =  entry.find(" ", space_tracker+1);
+
+            int word_length = (next_space != -1) ? next_space-space_tracker : next_space;
+            string word = entry.substr(space_tracker, word_length);
+
+            string modified_entry = entry.substr(first_space, entry.length()-first_space);
+
+            string word_code = to_string(getWordCode(word));
+
+            final_entries.push_back(word_code+modified_entry);
+        }
+
+        datafile.close();
+
+        ofstream inverted_index (file_name);
+
+        for(string s : final_entries){
+            inverted_index << s << endl;
+        }
+
+        inverted_index.close();
+
+        int pos = bar_width * progress;
+        s_progress ="[";
+        for (int p = 0; p < bar_width; p++) {
+            if (i < pos) s_progress += "=";
+            else if (i == pos) s_progress +=  ">";
+            else s_progress += " ";
+        }
+        s_progress += "] " + to_string(int(progress * 100)) + " % " + to_string(tracker) + "/32\r";
+        cout<<s_progress;
+        cout.flush();
+
+        progress = float(tracker)/32;
+    }
 
 
     return 0;
