@@ -29,8 +29,6 @@ struct Entry{
     vector<array<int, 2>> doc_id_freq;
 };
 
-
-
 struct CompareWordEntries{
 
     bool operator()(const Entry* left, const Entry* right){
@@ -71,7 +69,6 @@ vector<string> alphabet;
 vector<vector<string>> dictionary;
 
 vector<Entry*> entries;
-
 
 //returns a stemmed version of a given string
 //TODO: make this actually work without a library
@@ -273,8 +270,6 @@ void writeOutEntries(string id){
     entries_file.close();
 }
 
-
-//TODO: Update
 int main(){
 
     const int N = 32;
