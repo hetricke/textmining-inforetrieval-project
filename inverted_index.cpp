@@ -71,8 +71,6 @@ vector<vector<string>> dictionary;
 vector<Entry*> entries;
 
 //returns a stemmed version of a given string
-//TODO: make this actually work without a library
-
 string stemWord(const string &w, const bool &new_doc = false){
 
     //checks for urls and returns an empty string if true
@@ -103,22 +101,7 @@ string stemWord(const string &w, const bool &new_doc = false){
     if(regex_match(stemmed_word, regex("^(the|a|in|of|an|with|as)$"))){return "";}
 
     //removes all non-alphanumeric characters and gets rid of undesired endings/suffixes
-    stemmed_word = regex_replace(stemmed_word, regex("([^a-z0-9])|(ily|er|est|ed|ing|ly|ation)"), "");
-
-    //checks to make sure that the string isn't empty
-    if(stemmed_word.length() ==0){return "";}
-
-    //remove "-er"
-    //remove "-ing"
-    //remove "-able"
-    //remove "-ation"
-    //remove "-est"
-    //remove "-iest"
-    //remove "-ese"
-    //remove "-ful"
-    //remove "-s"
-    //remove "-es"
-
+    stemmed_word = regex_replace(stemmed_word, regex("([^a-z0-9])|(ily|er|est|ed|ing|ly|ation|able|iest|ese|ful|s|es)$"), "");
 
     return stemmed_word;
 }
