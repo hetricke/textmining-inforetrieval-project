@@ -72,6 +72,7 @@ vector<Entry*> entries;
 
 //returns a stemmed version of a given string
 //TODO: make this actually work without a library
+
 string stemWord(const string &w, const bool &new_doc = false){
 
     //checks for urls and returns an empty string if true
@@ -103,10 +104,21 @@ string stemWord(const string &w, const bool &new_doc = false){
     return stemmed_word;
 }
 
-//TODO: fill this in
 int getWordCode(const string& word){
 
-    return 0;
+    string first_letter = word.substr(0,1);
+
+    auto find_letter = std::lower_bound(alphabet.begin(), alphabet.end(), first_letter);
+    int index = distance(alphabet.begin(), find_letter);
+
+    auto find_word = std::lower_bound(dictionary[index].begin(), dictionary[index].end(), word);
+    int word_code = distance(dictionary[index].begin(), find_word);
+
+    for(int i = 0; i<index; i++){
+        word_code += dictionary[i].size();
+    }
+
+    return word_code;
 
 }
 
