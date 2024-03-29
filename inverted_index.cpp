@@ -81,8 +81,9 @@ string stemWord(const string &w, const bool &new_doc = false){
     if (regex_search(w.begin(), w.end(), m, url)){
 
         if (new_doc){
-
-            //TODO: search for "curid=" and return the numerical value that follows
+            int curid_search = w.find("curid=");
+            string doc_id = w.substr( curid_search, w.length());
+            return doc_id;
         }
         return "";
     }
@@ -98,8 +99,26 @@ string stemWord(const string &w, const bool &new_doc = false){
     //transforms the word into lowercase
     transform(stemmed_word.begin(), stemmed_word.end(), stemmed_word.begin(), ::tolower);
 
-    //removes all non-alphanumeric characters
-    stemmed_word = regex_replace(stemmed_word, regex(R"([^a-z0-9])"), "");
+    //checks for and removes stop words
+    if(regex_match(stemmed_word, regex("^(the|a|in|of|an|with|as)$"))){return "";}
+
+    //removes all non-alphanumeric characters and gets rid of undesired endings/suffixes
+    stemmed_word = regex_replace(stemmed_word, regex("([^a-z0-9])|(ily|er|est|ed|ing|ly|ation)"), "");
+
+    //checks to make sure that the string isn't empty
+    if(stemmed_word.length() ==0){return "";}
+
+    //remove "-er"
+    //remove "-ing"
+    //remove "-able"
+    //remove "-ation"
+    //remove "-est"
+    //remove "-iest"
+    //remove "-ese"
+    //remove "-ful"
+    //remove "-s"
+    //remove "-es"
+
 
     return stemmed_word;
 }
