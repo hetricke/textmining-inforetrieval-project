@@ -8,6 +8,7 @@
 #include <cctype>
 #include <regex>
 #include <locale>
+#include <array>
 
 using namespace std;
 
@@ -134,40 +135,61 @@ int updateAlphabetCount(const string &letter){
 
 }
 
-//TODO: Update
 void updateEntries(string word, int doc_id){
 
+    //searches for the word in the current index
     auto search_result = lower_bound(entries.begin(), entries.end(), word, CompareWordEntries());
 
     if (search_result != entries.end()){
 
         int index = std::distance(entries.begin(), search_result);
 
+        //if the word is already in the inverted index, finds the doc id in the list and updates the frequency
         if(entries[index]->word == word){
             Entry *v = entries[index];
 
             auto search_for_doc = lower_bound(v->doc_id_freq.begin(), v->doc_id_freq.end(), doc_id, CompareDocID());
 
             if (search_for_doc == v->doc_id_freq.end()){
-                int df[] = [doc_id, 1];
+                array<int, 2> df{ {doc_id, 1} };
                 v->doc_id_freq.push_back(df);
+                v->doc_count++;
+                return;
             }
+
             int doc_index = std::distance(v->doc_id_freq.begin(), search_for_doc);
 
-            if()
-
-            if(search_for_doc[doc_index][0] = doc_id){
+            if(search_for_doc[doc_index][0] == doc_id){
                 search_for_doc[doc_index][1]++;
+                return;
+            }
+
+            else{
+                array<int, 2> df{ {doc_id, 1} };
+                v->doc_id_freq.insert(search_for_doc, df);
+                v->doc_count++;
+                return;
             }
         }
 
+        //If the word isn't already in the inverted index but doesn't belong at the end, inserts the word
         else{
-            entries.insert(search_result, u);
+            Entry *e = new Entry;
+            e->word = word;
+            array<int, 2> df{{doc_id, 1}};
+            e->doc_id_freq.push_back(df);
+            entries.insert(search_result, e);
+            return;
         }
 
     }
 
+    //Inserts a new word to the end of the inverted index
     else{
+        Entry *e = new Entry;
+        e->word = word;
+        array<int, 2> df{{doc_id, 1}};
+        e->doc_id_freq.push_back(df);
         entries.push_back(e);
         return;
     }
