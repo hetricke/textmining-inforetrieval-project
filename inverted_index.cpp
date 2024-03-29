@@ -47,18 +47,18 @@ struct CompareWordEntries{
 
 struct CompareDocID{
 
-    bool operator()(const int* left, const int right){
-        return left[0] < right;
+    bool operator()(const array<int, 2> left, const array<int, 2> right){
+        return left[0] < right[0];
 
     }
 
-    bool operator()(const int left, const int* right){
+    bool operator()(const int left, const array<int, 2> right){
         return left < right[0];
 
     }
 
-    bool operator()(const int left, const int right){
-        return left < right;
+    bool operator()(const array<int, 2> left, const int right){
+        return left[0] < right;
 
     }
 };
@@ -97,6 +97,7 @@ string stemWord(const string &w){
 
     return stemmed_word;
 }
+
 
 int updateAlphabetCount(const string &letter){
 
@@ -146,7 +147,18 @@ void updateEntries(string word, int doc_id){
             Entry *v = entries[index];
 
             auto search_for_doc = lower_bound(v->doc_id_freq.begin(), v->doc_id_freq.end(), doc_id, CompareDocID());
-            entries.erase(search_result);
+
+            if (search_for_doc == v->doc_id_freq.end()){
+                int df[] = [doc_id, 1];
+                v->doc_id_freq.push_back(df);
+            }
+            int doc_index = std::distance(v->doc_id_freq.begin(), search_for_doc);
+
+            if()
+
+            if(search_for_doc[doc_index][0] = doc_id){
+                search_for_doc[doc_index][1]++;
+            }
         }
 
         else{
@@ -291,6 +303,6 @@ int main(){
     writeOutDictionary();
 
     cout<<"Printing entries..."<<endl;
-    writeOutentries();
+    writeOutEntries();
     return 0;
 }
