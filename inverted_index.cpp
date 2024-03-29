@@ -9,6 +9,9 @@
 #include <regex>
 #include <locale>
 #include <array>
+#include <cassert>
+
+#define assertm(exp, msg) assert(((void)msg, exp))
 
 using namespace std;
 
@@ -72,13 +75,18 @@ vector<Entry*> entries;
 
 
 //returns a stemmed version of a given string
-string stemWord(const string &w){
+//TODO: make this actually work without a library
+string stemWord(const string &w, const bool &new_doc = false){
 
     //checks for urls and returns an empty string if true
     regex url("(http|ftp|https):\\/\\/([\\w_-]+(?:(?:\\.[\\w_-]+)+))([\\w.,@?^=%&:\\/~+#-]*[\\w@?^=%&\\/~+#-])");
     smatch m;
     if (regex_search(w.begin(), w.end(), m, url)){
 
+        if (new_doc){
+
+            //TODO: search for "curid=" and return the numerical value that follows
+        }
         return "";
     }
 
@@ -135,7 +143,7 @@ int updateAlphabetCount(const string &letter){
 
 }
 
-void updateEntries(string word, int doc_id){
+void updateEntries(const string &word, const int &doc_id){
 
     //searches for the word in the current index
     auto search_result = lower_bound(entries.begin(), entries.end(), word, CompareWordEntries());
@@ -197,13 +205,12 @@ void updateEntries(string word, int doc_id){
 
 }
 
-void updateDictionary(const string &word, bool new_doc){
+void updateDictionary(const string &word){
 
     int letter_index = updateAlphabetCount(word.substr(0,1));
 
     if (dictionary[letter_index].empty()){
         dictionary[letter_index].push_back(word);
-        updateEntries(word);
         return;
     }
 
@@ -239,8 +246,11 @@ void writeOutDictionary(){
     dictionary_file.close();
 }
 
-void writeOutEntries(){
-    ofstream entries_file ("entries.txt");
+//WARNING: calling this function wipes the current entries list
+void writeOutEntries(string id){
+
+    string output_file_name = "inverted_index_"+id;
+    ofstream entries_file (output_file_name);
 
     for(Entry *i : entries){
         string entry_output = to_string(i->word_code) + " ";
@@ -253,78 +263,104 @@ void writeOutEntries(){
         entries_file << entry_output << endl;
     }
 
+    entries.clear();
+
     entries_file.close();
 }
 
 
 //TODO: Update
+//remember to call update Entries here
 int main(){
-    ifstream datafile("tiny_wikipedia.txt");
-    string article;
 
-    cout<<"Assembling dictionary..."<<endl;
+
+
+
+    string collection_name = "wiki2022_small.";
+    string collection_id = "000000";
+
+    //progress bar
+    cout<<"Assembling inverted index for article collection "<< i <<"...." <<endl;
     float progress = 0;
     int bar_width = 70;
     int tracker = 0;
     string s_progress;
 
-    while(getline(datafile, article)){
-        int word_tracker = 0;
-        vector<string> article_words;
-        while (word_tracker != -1){
+    //iterates through all article collections to create inverted indexes
+    for(int i = 0; i<32; i++){
 
-            //slices word out of article and stems it
-            int next_space = article.find(" ", word_tracker+1);
-            int word_length = (next_space != -1) ? next_space-word_tracker : next_space;
-            string word = article.substr(word_tracker, word_length);
-            word = stemWord(word);
+        string current_col = to_string(i);
+        collection_id = collection_id.substr(0, collection_id.length()-current_col.length());
+        collection_id +=current_col;
+        assertm(collection_id.length()==6, "Something wrong with filename string");
 
-            if(word.empty()){
+        ifstream datafile(collection_name+collection_id);
+        string article;
+
+        //iterates through each article
+        while(getline(datafile, article)){
+            int word_tracker = 0;
+            int doc_id = -1;
+
+            //iterates through each word in the article
+            while (word_tracker != -1){
+
+                //slices word out of article and stems it
+                int next_space = article.find(" ", word_tracker+1);
+                int word_length = (next_space != -1) ? next_space-word_tracker : next_space;
+                string word = article.substr(word_tracker, word_length);
+
+                //assumes the first 'word' in an article is a link containing the article id and extracts the id
+                if(word_tracker == 0){
+                    doc_id = std::stoi(stemWord(word, true));
+                    word_tracker = next_space;
+                    continue;
+                }
+
+                word = stemWord(word);
+
+                if(word.empty()){
+                    word_tracker = next_space;
+                    continue;
+                }
+
+                updateDictionary(word);
+                updateEntries(word, doc_id);
+
                 word_tracker = next_space;
-                continue;
-            }
-
-            //checks to see if word is new in article
-            auto search = lower_bound(article_words.begin(), article_words.end(), word);
-
-            if(search == article_words.end()){
-                article_words.push_back(word);
-                updateDictionary(word, true);
 
             }
-            else if (*(search) != word){
-                article_words.insert(search, word);
-                updateDictionary(word, true);
-            }
-
-            else{
-                updateDictionary(word, false);
-            }
-
-            word_tracker = next_space;
 
         }
+
+        datafile.close();
+
+        //prints out the current inverted index
+        writeOutEntries(collection_id);
+
         tracker++;
+
         int pos = bar_width * progress;
         s_progress ="[";
-        for (int i = 0; i < bar_width; ++i) {
+        for (int p = 0; p < bar_width; p++) {
             if (i < pos) s_progress += "=";
             else if (i == pos) s_progress +=  ">";
             else s_progress += " ";
         }
-        s_progress += "] " + to_string(int(progress * 100)) + " % " + to_string(tracker) + "/50000\r";
+        s_progress += "] " + to_string(int(progress * 100)) + " % " + to_string(tracker) + "/32\r";
         cout<<s_progress;
         cout.flush();
 
-        progress = float(tracker)/50000;
+        progress = float(tracker)/32;
+
     }
 
-    datafile.close();
     cout<<endl;
     cout<<"Printing dictionary..."<<endl;
     writeOutDictionary();
 
-    cout<<"Printing entries..."<<endl;
-    writeOutEntries();
+
+
+
     return 0;
 }
