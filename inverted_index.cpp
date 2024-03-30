@@ -24,7 +24,7 @@ using namespace std;
 
 struct Entry{
     int word_code = -1;
-    string word;
+    string *word;
     int doc_count = 1;
     vector<array<int, 2>> doc_id_freq;
 };
@@ -32,15 +32,19 @@ struct Entry{
 struct CompareWordEntries{
 
     bool operator()(const Entry* left, const Entry* right){
-        return left->word < right->word;
+        string *wl = left->word;
+        string *wr = right->word;
+        return *wl < *wr;
     }
 
-    bool operator()(const Entry *left, const string &right){
-        return left->word < right;
+    bool operator()(const Entry *left, const string *right){
+        string *w = left->word;
+        return *w < *right;
     }
 
-    bool operator()(const string &left, const Entry* right){
-        return left < right->word;
+    bool operator()(const string *left, const Entry* right){
+        string *w = right->word;
+        return *left < *w;
     }
 
 
@@ -66,23 +70,23 @@ struct CompareDocID{
 
 vector<string> alphabet;
 
-vector<vector<string>> dictionary;
+vector<vector<string*>> dictionary;
 
 vector<Entry*> entries;
 
 //returns a stemmed version of a given string
 string stemWord(const string &w, const bool &new_doc = false){
 
+    if (new_doc){
+        int curid_search = w.find("curid=");
+        string doc_id = w.substr( curid_search+6, w.length()-curid_search-6);
+        return doc_id;
+    }
+
     //checks for urls and returns an empty string if true
     regex url("(http|ftp|https):\\/\\/([\\w_-]+(?:(?:\\.[\\w_-]+)+))([\\w.,@?^=%&:\\/~+#-]*[\\w@?^=%&\\/~+#-])");
     smatch m;
     if (regex_search(w.begin(), w.end(), m, url)){
-
-        if (new_doc){
-            int curid_search = w.find("curid=");
-            string doc_id = w.substr( curid_search, w.length());
-            return doc_id;
-        }
         return "";
     }
 
@@ -106,9 +110,9 @@ string stemWord(const string &w, const bool &new_doc = false){
     return stemmed_word;
 }
 
-int getWordCode(const string& word){
+int getWordCode(const string *word){
 
-    string first_letter = word.substr(0,1);
+    string first_letter = word->substr(0,1);
 
     auto find_letter = std::lower_bound(alphabet.begin(), alphabet.end(), first_letter);
     int index = distance(alphabet.begin(), find_letter);
@@ -128,7 +132,7 @@ int updateAlphabetCount(const string &letter){
 
     if (alphabet.empty()){
         alphabet.push_back(letter);
-        vector<string> new_dict;
+        vector<string*> new_dict;
         dictionary.push_back(new_dict);
         return 0;
 
@@ -138,7 +142,7 @@ int updateAlphabetCount(const string &letter){
 
     if(search_result == alphabet.end()){
         alphabet.push_back(letter);
-        vector<string> new_dict;
+        vector<string*> new_dict;
         dictionary.push_back(new_dict);
 
         return alphabet.size()-1;
@@ -151,7 +155,7 @@ int updateAlphabetCount(const string &letter){
     else{
         alphabet.insert(search_result, letter);
 
-        vector<string> new_dict;
+        vector<string*> new_dict;
         dictionary.insert(dictionary.begin()+index, new_dict);
 
         return index;
@@ -159,7 +163,7 @@ int updateAlphabetCount(const string &letter){
 
 }
 
-void updateEntries(const string &word, const int &doc_id){
+void updateEntries(string *word, const int &doc_id){
 
     //searches for the word in the current index
     auto search_result = lower_bound(entries.begin(), entries.end(), word, CompareWordEntries());
@@ -169,7 +173,8 @@ void updateEntries(const string &word, const int &doc_id){
         int index = std::distance(entries.begin(), search_result);
 
         //if the word is already in the inverted index, finds the doc id in the list and updates the frequency
-        if(entries[index]->word == word){
+        string *w = entries[index]->word;
+        if(*w == *word){
             Entry *v = entries[index];
 
             auto search_for_doc = lower_bound(v->doc_id_freq.begin(), v->doc_id_freq.end(), doc_id, CompareDocID());
@@ -221,9 +226,9 @@ void updateEntries(const string &word, const int &doc_id){
 
 }
 
-void updateDictionary(const string &word){
+void updateDictionary(string *word){
 
-    int letter_index = updateAlphabetCount(word.substr(0,1));
+    int letter_index = updateAlphabetCount(word->substr(0,1));
 
     if (dictionary[letter_index].empty()){
         dictionary[letter_index].push_back(word);
@@ -253,9 +258,9 @@ void updateDictionary(const string &word){
 void writeOutDictionary(){
     ofstream dictionary_file ("dictionary.txt");
 
-    for(vector<string> &i : dictionary){
-        for(string &word : i){
-            dictionary_file << word << endl;
+    for(vector<string*> &i : dictionary){
+        for(string *word : i){
+            dictionary_file << *word << endl;
         }
     }
 
@@ -270,7 +275,8 @@ void writeOutEntries(string id){
 
     for(Entry *i : entries){
         string entry_output = to_string(i->word_code) + " ";
-        entry_output += i->word + " ";
+        string *w = i->word;
+        entry_output += *w + " ";
         entry_output += to_string(i->doc_count) + " ";
 
         for(auto doc_freq : i->doc_id_freq){
@@ -286,9 +292,9 @@ void writeOutEntries(string id){
 
 int main(){
 
-    const int N = 32;
+    const int N = 2;
 
-    string collection_name = "wiki2022_small.";
+    string collection_name = "wiki2022/wiki2022_small.";
     string collection_id = "000000";
 
     //progress bar
@@ -306,13 +312,28 @@ int main(){
         collection_id +=current_col;
         assertm(collection_id.length()==6, "Something wrong with filename string");
 
-        ifstream datafile(collection_name+collection_id);
+        string datafile_name = collection_name+collection_id;
+        ifstream datafile(datafile_name);
+
+        assertm(datafile.is_open(), "File failed to open");
         string article;
 
+        int count = 0;
+
+        cout<<"New collection..."<<endl;
         //iterates through each article
         while(getline(datafile, article)){
             int word_tracker = 0;
             int doc_id = -1;
+            count++;
+            cout<<count<<endl;
+//            cout<<entries.size()<<" : ";
+//
+//            int total_words = 0;
+//            for(auto d : dictionary){ total_words += d.size();}
+//
+//            cout<<total_words<<endl;
+
 
             //iterates through each word in the article
             while (word_tracker != -1){
@@ -321,6 +342,7 @@ int main(){
                 int next_space = article.find(" ", word_tracker+1);
                 int word_length = (next_space != -1) ? next_space-word_tracker : next_space;
                 string word = article.substr(word_tracker, word_length);
+
 
                 //assumes the first 'word' in an article is a link containing the article id and extracts the id
                 if(word_tracker == 0){
@@ -336,8 +358,8 @@ int main(){
                     continue;
                 }
 
-                updateDictionary(word);
-                updateEntries(word, doc_id);
+                updateDictionary(&word);
+                updateEntries(&word, doc_id);
 
                 word_tracker = next_space;
 
@@ -405,7 +427,7 @@ int main(){
 
             string modified_entry = entry.substr(first_space, entry.length()-first_space);
 
-            string word_code = to_string(getWordCode(word));
+            string word_code = to_string(getWordCode(&word));
 
             final_entries.push_back(word_code+modified_entry);
         }
