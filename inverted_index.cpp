@@ -15,18 +15,13 @@
 using namespace std;
 
 //TODO: fix stemming operation
-/*
- * Aight. Here's the plan.
- * The unigram struct becomes an entry struct recording the relevant inverted index data
- * Dictionary vector(s) store a string. The idea is on the first pass-thru you assemble all aspects of the inverted index entry except the word code
- * Then you iterate over just the local index collection again to insert the correct word code, binary searching the dictionary to find it
- * */
+
 
 struct Entry{
     int word_code = -1;
     string *word;
     int doc_count = 1;
-    vector<array<int, 2>> doc_id_freq;
+    vector<vector<int>> doc_id_freq;
 };
 
 struct CompareWordEntries{
@@ -52,17 +47,17 @@ struct CompareWordEntries{
 
 struct CompareDocID{
 
-    bool operator()(const array<int, 2> left, const array<int, 2> right){
+    bool operator()(const vector<int> left, const vector<int> right){
         return left[0] < right[0];
 
     }
 
-    bool operator()(const int left, const array<int, 2> right){
+    bool operator()(const int left, const vector<int> right){
         return left < right[0];
 
     }
 
-    bool operator()(const array<int, 2> left, const int right){
+    bool operator()(const vector<int> left, const int right){
         return left[0] < right;
 
     }
@@ -163,8 +158,15 @@ int updateAlphabetCount(const string &letter){
 
 }
 
-void updateEntries(string *word, const int &doc_id){
+//TODO: Hi! because the words are being passed as pointers and the pointer goes to the same variable that updates every round
+//everything is totally fucked!
+//i think i gotta pass as a copy
+//and pointerify from there
+//this will in turn fuck up the dictionary and the entries pointing to the same thing
+//maybe i can do a new string forced space inside main?
+void updateEntries(string word, const int &doc_id){
 
+    cout<<*word<<": "<<word<<endl;
     //searches for the word in the current index
     auto search_result = lower_bound(entries.begin(), entries.end(), word, CompareWordEntries());
 
@@ -177,10 +179,17 @@ void updateEntries(string *word, const int &doc_id){
         if(*w == *word){
             Entry *v = entries[index];
 
+//            cout<<*word<<": ";
+//            //somehow all the Entry vectors point to the same array.
+//            for(vector<int> a : v->doc_id_freq){
+//                cout<<"["<<a[0] << ", "<< a[1]<<"] ";
+//            }
+//            cout<<endl;
+
             auto search_for_doc = lower_bound(v->doc_id_freq.begin(), v->doc_id_freq.end(), doc_id, CompareDocID());
 
             if (search_for_doc == v->doc_id_freq.end()){
-                array<int, 2> df{ {doc_id, 1} };
+                vector<int> df = {doc_id, 1};
                 v->doc_id_freq.push_back(df);
                 v->doc_count++;
                 return;
@@ -188,14 +197,29 @@ void updateEntries(string *word, const int &doc_id){
 
             int doc_index = std::distance(v->doc_id_freq.begin(), search_for_doc);
 
+
+//            cout<<v->doc_id_freq.size()<< ": ";
+//            cout<<doc_index<<endl;
+
+            //TODO: here's the fucker
+            //doc_id = 339
+            //doc_index = 6549
+            //count = 15
+            //...there's no way the index should be 6549
             if(search_for_doc[doc_index][0] == doc_id){
                 search_for_doc[doc_index][1]++;
                 return;
             }
 
             else{
-                array<int, 2> df{ {doc_id, 1} };
+                vector<int> df = {doc_id, 1};
                 v->doc_id_freq.insert(search_for_doc, df);
+                cout<<*word<<": ";
+                //somehow all the Entry vectors point to the same array.
+//                for(vector<int> a : v->doc_id_freq){
+//                    cout<<"["<<a[0] << ", "<< a[1]<<"] ";
+//                }
+//                cout<<endl;
                 v->doc_count++;
                 return;
             }
@@ -205,8 +229,15 @@ void updateEntries(string *word, const int &doc_id){
         else{
             Entry *e = new Entry;
             e->word = word;
-            array<int, 2> df{{doc_id, 1}};
+            vector<int> df = {doc_id, 1};
             e->doc_id_freq.push_back(df);
+
+            cout<<*word<<": ";
+            //somehow all the Entry vectors point to the same array.
+//            for(vector<int> a : e->doc_id_freq){
+//                cout<<"["<<a[0] << ", "<< a[1]<<"] ";
+//            }
+//            cout<<endl;
             entries.insert(search_result, e);
             return;
         }
@@ -217,7 +248,7 @@ void updateEntries(string *word, const int &doc_id){
     else{
         Entry *e = new Entry;
         e->word = word;
-        array<int, 2> df{{doc_id, 1}};
+        vector<int> df = {doc_id, 1};
         e->doc_id_freq.push_back(df);
         entries.push_back(e);
         return;
@@ -327,17 +358,10 @@ int main(){
             int doc_id = -1;
             count++;
             cout<<count<<endl;
-//            cout<<entries.size()<<" : ";
-//
-//            int total_words = 0;
-//            for(auto d : dictionary){ total_words += d.size();}
-//
-//            cout<<total_words<<endl;
 
-
+            int word_count = 0;
             //iterates through each word in the article
             while (word_tracker != -1){
-
                 //slices word out of article and stems it
                 int next_space = article.find(" ", word_tracker+1);
                 int word_length = (next_space != -1) ? next_space-word_tracker : next_space;
@@ -381,11 +405,11 @@ int main(){
             else if (i == pos) s_progress +=  ">";
             else s_progress += " ";
         }
-        s_progress += "] " + to_string(int(progress * 100)) + " % " + to_string(tracker) + "/32\r";
+        s_progress += "] " + to_string(int(progress * 100)) + " % " + to_string(tracker) + "/"+ to_string(N)+"\r";
         cout<<s_progress;
         cout.flush();
 
-        progress = float(tracker)/32;
+        progress = float(tracker)/N;
 
     }
 
