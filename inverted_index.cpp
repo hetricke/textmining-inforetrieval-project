@@ -26,20 +26,16 @@ struct Entry{
 
 struct CompareWordEntries{
 
-    bool operator()(const Entry* left, const Entry* right){
-        string *wl = left->word;
-        string *wr = right->word;
-        return *wl < *wr;
+    bool operator()(Entry* left, Entry* right){
+        return *(left->word) < *(right->word);
     }
 
-    bool operator()(const Entry *left, const string *right){
-        string *w = left->word;
-        return *w < *right;
+    bool operator()(Entry *left, const string right){
+        return *(left->word) < right;
     }
 
-    bool operator()(const string *left, const Entry* right){
-        string *w = right->word;
-        return *left < *w;
+    bool operator()(const string left, Entry* right){
+        return left < *(right->word);
     }
 
 
@@ -47,20 +43,29 @@ struct CompareWordEntries{
 
 struct CompareDocID{
 
-    bool operator()(const vector<int> left, const vector<int> right){
+    bool operator()(const vector<int> &left, const vector<int> &right){
         return left[0] < right[0];
 
     }
 
-    bool operator()(const int left, const vector<int> right){
+    bool operator()(const int &left, const vector<int> &right){
         return left < right[0];
 
     }
 
-    bool operator()(const vector<int> left, const int right){
+    bool operator()(const vector<int> &left, const int &right){
         return left[0] < right;
 
     }
+};
+
+struct CompareDictionaryWords{
+
+    bool operator()(const string *left, const string *right){
+        return *left < *right;
+
+    }
+
 };
 
 vector<string> alphabet;
@@ -112,7 +117,7 @@ int getWordCode(const string *word){
     auto find_letter = std::lower_bound(alphabet.begin(), alphabet.end(), first_letter);
     int index = distance(alphabet.begin(), find_letter);
 
-    auto find_word = std::lower_bound(dictionary[index].begin(), dictionary[index].end(), word);
+    auto find_word = std::lower_bound(dictionary[index].begin(), dictionary[index].end(), word, CompareDictionaryWords());
     int word_code = distance(dictionary[index].begin(), find_word);
 
     for(int i = 0; i<index; i++){
@@ -158,17 +163,43 @@ int updateAlphabetCount(const string &letter){
 
 }
 
-//TODO: Hi! because the words are being passed as pointers and the pointer goes to the same variable that updates every round
-//everything is totally fucked!
-//i think i gotta pass as a copy
-//and pointerify from there
-//this will in turn fuck up the dictionary and the entries pointing to the same thing
-//maybe i can do a new string forced space inside main?
-void updateEntries(string word, const int &doc_id){
+//updates the dictionary and returns a pointer a string containing the word
+string* updateDictionary(const string w){
 
-    cout<<*word<<": "<<word<<endl;
+    int letter_index = updateAlphabetCount(w.substr(0,1));
+
+    auto *word = new string(w);
+
+    if (dictionary[letter_index].empty()){
+        dictionary[letter_index].push_back(word);
+        return word;
+    }
+
+    auto search_result = lower_bound(dictionary[letter_index].begin(), dictionary[letter_index].end(), word, CompareDictionaryWords());
+
+    if (search_result == dictionary[letter_index].end()){
+        dictionary[letter_index].push_back(word);
+        return word;
+    }
+
+    int index = std::distance(dictionary[letter_index].begin(), search_result);
+
+    if (*dictionary[letter_index][index] == *word){
+        delete word;
+        word = nullptr;
+        return dictionary[letter_index][index];
+    }
+    else{
+        dictionary[letter_index].insert(search_result, word);
+        return word;
+    }
+
+}
+
+void updateEntries(string *word, const int &doc_id){
+
     //searches for the word in the current index
-    auto search_result = lower_bound(entries.begin(), entries.end(), word, CompareWordEntries());
+    auto search_result = lower_bound(entries.begin(), entries.end(), *word, CompareWordEntries());
 
     if (search_result != entries.end()){
 
@@ -179,14 +210,8 @@ void updateEntries(string word, const int &doc_id){
         if(*w == *word){
             Entry *v = entries[index];
 
-//            cout<<*word<<": ";
-//            //somehow all the Entry vectors point to the same array.
-//            for(vector<int> a : v->doc_id_freq){
-//                cout<<"["<<a[0] << ", "<< a[1]<<"] ";
-//            }
-//            cout<<endl;
-
             auto search_for_doc = lower_bound(v->doc_id_freq.begin(), v->doc_id_freq.end(), doc_id, CompareDocID());
+
 
             if (search_for_doc == v->doc_id_freq.end()){
                 vector<int> df = {doc_id, 1};
@@ -197,29 +222,15 @@ void updateEntries(string word, const int &doc_id){
 
             int doc_index = std::distance(v->doc_id_freq.begin(), search_for_doc);
 
+            if(v->doc_id_freq[doc_index][0] == doc_id){
+                v->doc_id_freq[doc_index][1] += 1;
 
-//            cout<<v->doc_id_freq.size()<< ": ";
-//            cout<<doc_index<<endl;
-
-            //TODO: here's the fucker
-            //doc_id = 339
-            //doc_index = 6549
-            //count = 15
-            //...there's no way the index should be 6549
-            if(search_for_doc[doc_index][0] == doc_id){
-                search_for_doc[doc_index][1]++;
                 return;
             }
 
             else{
                 vector<int> df = {doc_id, 1};
                 v->doc_id_freq.insert(search_for_doc, df);
-                cout<<*word<<": ";
-                //somehow all the Entry vectors point to the same array.
-//                for(vector<int> a : v->doc_id_freq){
-//                    cout<<"["<<a[0] << ", "<< a[1]<<"] ";
-//                }
-//                cout<<endl;
                 v->doc_count++;
                 return;
             }
@@ -231,13 +242,6 @@ void updateEntries(string word, const int &doc_id){
             e->word = word;
             vector<int> df = {doc_id, 1};
             e->doc_id_freq.push_back(df);
-
-            cout<<*word<<": ";
-            //somehow all the Entry vectors point to the same array.
-//            for(vector<int> a : e->doc_id_freq){
-//                cout<<"["<<a[0] << ", "<< a[1]<<"] ";
-//            }
-//            cout<<endl;
             entries.insert(search_result, e);
             return;
         }
@@ -251,40 +255,13 @@ void updateEntries(string word, const int &doc_id){
         vector<int> df = {doc_id, 1};
         e->doc_id_freq.push_back(df);
         entries.push_back(e);
+
         return;
     }
 
 
 }
 
-void updateDictionary(string *word){
-
-    int letter_index = updateAlphabetCount(word->substr(0,1));
-
-    if (dictionary[letter_index].empty()){
-        dictionary[letter_index].push_back(word);
-        return;
-    }
-
-    auto search_result = lower_bound(dictionary[letter_index].begin(), dictionary[letter_index].end(), word);
-
-    if (search_result == dictionary[letter_index].end()){
-
-        dictionary[letter_index].push_back(word);
-        return;
-    }
-
-    int index = std::distance(dictionary[letter_index].begin(), search_result);
-
-    if (dictionary[letter_index][index] == word){
-        return;
-    }
-    else{
-        dictionary[letter_index].insert(search_result, word);
-        return;
-    }
-
-}
 
 void writeOutDictionary(){
     ofstream dictionary_file ("dictionary.txt");
@@ -299,21 +276,26 @@ void writeOutDictionary(){
 }
 
 //WARNING: calling this function wipes the current entries list
-void writeOutEntries(string id){
+void writeOutEntries(const string &id){
 
     string output_file_name = "inverted_index_"+id;
     ofstream entries_file (output_file_name);
 
-    for(Entry *i : entries){
-        string entry_output = to_string(i->word_code) + " ";
-        string *w = i->word;
-        entry_output += *w + " ";
-        entry_output += to_string(i->doc_count) + " ";
+    int max_size = entries.size();
 
-        for(auto doc_freq : i->doc_id_freq){
+    for(int i = 0; i<max_size; i++){
+        string entry_output = to_string(entries[i]->word_code) + " ";
+        string *w = entries[i]->word;
+        entry_output += *w + " ";
+        entry_output += to_string(entries[i]->doc_count) + " ";
+
+        for(auto doc_freq : entries[i]->doc_id_freq){
             entry_output += "(" + to_string(doc_freq[0]) + ", " + to_string(doc_freq[1]) + ")";
         }
         entries_file << entry_output << endl;
+
+        delete entries[i];
+        entries[i] = nullptr;
     }
 
     entries.clear();
@@ -351,13 +333,12 @@ int main(){
 
         int count = 0;
 
-        cout<<"New collection..."<<endl;
         //iterates through each article
         while(getline(datafile, article)){
             int word_tracker = 0;
             int doc_id = -1;
-            count++;
-            cout<<count<<endl;
+//            count++;
+//            cout<<count<<endl;
 
             int word_count = 0;
             //iterates through each word in the article
@@ -382,8 +363,8 @@ int main(){
                     continue;
                 }
 
-                updateDictionary(&word);
-                updateEntries(&word, doc_id);
+                string *word_ptr = updateDictionary(word);
+                updateEntries(word_ptr, doc_id);
 
                 word_tracker = next_space;
 
