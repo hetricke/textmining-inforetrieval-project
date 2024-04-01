@@ -14,9 +14,6 @@
 
 using namespace std;
 
-//TODO: fix stemming operation
-
-
 struct Entry{
     int word_code = -1;
     string *word;
@@ -123,33 +120,37 @@ string stemWord(const string &w, const bool &new_doc = false){
 
 int getWordCode(const string &word){
 
-    static string last_letter = NULL;
-    static int letter_increment = NULL;
+    static string last_letter = "";
+    static int letter_increment = 0;
 
     string first_letter = word.substr(0,1);
 
-    //TODO: try switching to a linear search of the dictionary index, tracking the latest letter added
 
-    auto find_letter = std::lower_bound(alphabet.begin(), alphabet.end(), first_letter);
+    if(first_letter != last_letter){
+        cout<<"New letter: ";
+        last_letter = first_letter;
+        letter_increment = 0;
+    }
+
+
+    auto find_letter = lower_bound(alphabet.begin(), alphabet.end(), first_letter);
     int index = distance(alphabet.begin(), find_letter);
-    cout<<*find_letter<<": ";
 
-    //TODO
-    //for some reason this isn't actually searching; it just returns the first value of the vector
-    auto find_word = std::lower_bound(dictionary[index].begin(), dictionary[index].end(), &word, CompareDictionaryWords());
-    int word_code = distance(dictionary[index].begin(), find_word);
+    for(int i = letter_increment; i<dictionary[index].size(); i++){
 
-    for (string *s : dictionary[index]){cout<<*s<<", ";}
-    cout<<endl;
+        if(*dictionary[index][i] == word){
+            letter_increment +=i;
+            break;
+        }
+    }
 
-    cout<<word<<": ";
-    cout<<flush;
-    cout<<**(find_word)<<": ";
-    cout<<*dictionary[index][word_code]<<flush<<endl;
+    int word_code = letter_increment;
 
     for(int i = 0; i<index; i++){
         word_code += dictionary[i].size();
     }
+
+    letter_increment++;
 
     return word_code;
 
@@ -332,7 +333,7 @@ void writeOutEntries(const string &id){
 
 int main(){
 
-    const int N = 1;
+    const int N = 32;
 
     string collection_name = "wiki2022/wiki2022_small.";
     string collection_id = "000000";
@@ -358,10 +359,8 @@ int main(){
         assertm(datafile.is_open(), "File failed to open");
         string article;
 
-        int early_stop = 0;
-
         //iterates through each article
-        while(getline(datafile, article) && early_stop > -1){
+        while(getline(datafile, article)){
             int word_tracker = 0;
             int doc_id = -1;
 
@@ -394,8 +393,6 @@ int main(){
                 word_tracker = next_space;
 
             }
-
-            early_stop--;
 
         }
 
@@ -456,7 +453,7 @@ int main(){
             int next_space =  entry.find(" ", space_tracker+1);
 
             int word_length = (next_space != -1) ? next_space-space_tracker : next_space;
-            string word = entry.substr(space_tracker, word_length);
+            string word = entry.substr(space_tracker+1, word_length);
 
             string modified_entry = entry.substr(first_space, entry.length()-first_space);
             string word_code = to_string(getWordCode(word));
