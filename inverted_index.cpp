@@ -127,7 +127,6 @@ int getWordCode(const string &word){
 
 
     if(first_letter != last_letter){
-        cout<<"New letter: ";
         last_letter = first_letter;
         letter_increment = 0;
     }
