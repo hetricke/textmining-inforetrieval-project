@@ -63,7 +63,18 @@ struct CompareDictionaryWords{
 
     bool operator()(const string *left, const string *right){
         return *left < *right;
+    }
 
+    bool operator()(const string *left, const string &right){
+        return *left < right;
+    }
+
+    bool operator()(const string &left, const string *right){
+        return left < *right;
+    }
+
+    bool operator()(const string &left, const string &right){
+        return left < right;
     }
 
 };
@@ -110,15 +121,31 @@ string stemWord(const string &w, const bool &new_doc = false){
     return stemmed_word;
 }
 
-int getWordCode(const string *word){
+int getWordCode(const string &word){
 
-    string first_letter = word->substr(0,1);
+    static string last_letter = NULL;
+    static int letter_increment = NULL;
+
+    string first_letter = word.substr(0,1);
+
+    //TODO: try switching to a linear search of the dictionary index, tracking the latest letter added
 
     auto find_letter = std::lower_bound(alphabet.begin(), alphabet.end(), first_letter);
     int index = distance(alphabet.begin(), find_letter);
+    cout<<*find_letter<<": ";
 
-    auto find_word = std::lower_bound(dictionary[index].begin(), dictionary[index].end(), word, CompareDictionaryWords());
+    //TODO
+    //for some reason this isn't actually searching; it just returns the first value of the vector
+    auto find_word = std::lower_bound(dictionary[index].begin(), dictionary[index].end(), &word, CompareDictionaryWords());
     int word_code = distance(dictionary[index].begin(), find_word);
+
+    for (string *s : dictionary[index]){cout<<*s<<", ";}
+    cout<<endl;
+
+    cout<<word<<": ";
+    cout<<flush;
+    cout<<**(find_word)<<": ";
+    cout<<*dictionary[index][word_code]<<flush<<endl;
 
     for(int i = 0; i<index; i++){
         word_code += dictionary[i].size();
@@ -305,7 +332,7 @@ void writeOutEntries(const string &id){
 
 int main(){
 
-    const int N = 2;
+    const int N = 1;
 
     string collection_name = "wiki2022/wiki2022_small.";
     string collection_id = "000000";
@@ -331,14 +358,12 @@ int main(){
         assertm(datafile.is_open(), "File failed to open");
         string article;
 
-        int count = 0;
+        int early_stop = 0;
 
         //iterates through each article
-        while(getline(datafile, article)){
+        while(getline(datafile, article) && early_stop > -1){
             int word_tracker = 0;
             int doc_id = -1;
-//            count++;
-//            cout<<count<<endl;
 
             int word_count = 0;
             //iterates through each word in the article
@@ -369,6 +394,8 @@ int main(){
                 word_tracker = next_space;
 
             }
+
+            early_stop--;
 
         }
 
@@ -418,7 +445,8 @@ int main(){
         int space_tracker = 0;
         string entry;
 
-        ifstream datafile(collection_name+collection_id);
+        ifstream datafile(file_name);
+        assertm(datafile.is_open(), "Inverted index file failed to open.");
 
 
         while(getline(datafile, entry)){
@@ -431,10 +459,10 @@ int main(){
             string word = entry.substr(space_tracker, word_length);
 
             string modified_entry = entry.substr(first_space, entry.length()-first_space);
-
-            string word_code = to_string(getWordCode(&word));
+            string word_code = to_string(getWordCode(word));
 
             final_entries.push_back(word_code+modified_entry);
+
         }
 
         datafile.close();
