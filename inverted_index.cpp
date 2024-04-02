@@ -332,7 +332,7 @@ void writeOutEntries(const string &id){
 
 int main(){
 
-    const int N = 32;
+    const int N = 2;
 
     string collection_name = "wiki2022/wiki2022_small.";
     string collection_id = "000000";
@@ -358,8 +358,9 @@ int main(){
         assertm(datafile.is_open(), "File failed to open");
         string article;
 
+        int early_end = 2;
         //iterates through each article
-        while(getline(datafile, article)){
+        while(getline(datafile, article) && early_end > -1){
             int word_tracker = 0;
             int doc_id = -1;
 
@@ -392,6 +393,8 @@ int main(){
                 word_tracker = next_space;
 
             }
+
+            early_end--;
 
         }
 
